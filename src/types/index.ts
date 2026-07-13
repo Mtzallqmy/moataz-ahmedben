@@ -3,6 +3,8 @@ export interface User {
   name: string
   email: string
   avatar?: string
+  roles?: string[]
+  forcePasswordChange?: boolean
   createdAt: string
 }
 

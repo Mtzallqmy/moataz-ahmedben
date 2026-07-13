@@ -21,6 +21,8 @@ function mapUser(authUser: any): User {
     name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'مستخدم',
     email: authUser.email || '',
     avatar: authUser.user_metadata?.avatar_url,
+    roles: authUser.user_metadata?.roles || [],
+    forcePasswordChange: authUser.user_metadata?.force_password_change || false,
     createdAt: authUser.created_at,
   }
 }

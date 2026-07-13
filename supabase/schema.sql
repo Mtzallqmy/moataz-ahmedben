@@ -87,3 +87,43 @@ create policy "messages_owner_delete" on public.messages for delete to authentic
 
 grant select, insert, update, delete on public.providers, public.chats, public.messages to authenticated;
 revoke all on public.providers, public.chats, public.messages from anon;
+-- 1. إعداد الأدوار في metadata المستخدمين
+-- سنستخدم auth.users.raw_user_meta_data لتخزين الأدوار
+
+-- 2. إنشاء جدول سجل التدقيق إذا لم يكن موجوداً
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  action text not null,
+  details jsonb,
+  created_at timestamptz default now()
+);
+
+-- 3. تفعيل RLS على سجل التدقيق
+alter table public.audit_logs enable row level security;
+create policy "audit_logs_owner_select" on public.audit_logs for select to authenticated 
+using (auth.jwt() -> 'user_metadata' ->> 'role' ? 'OWNER');
+
+-- 4. وظيفة لحماية آخر OWNER
+create or replace function public.check_last_owner()
+returns trigger as $$
+begin
+  if (old.raw_user_meta_data->>'roles')::jsonb ? 'OWNER' and 
+     not ((new.raw_user_meta_data->>'roles')::jsonb ? 'OWNER') then
+    if (select count(*) from auth.users where (raw_user_meta_data->>'roles')::jsonb ? 'OWNER') <= 1 then
+      raise exception 'لا يمكن حذف أو تخفيض صلاحيات آخر مالك (OWNER) في النظام';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- 5. تريجر لحماية المالك
+drop trigger if exists ensure_last_owner on auth.users;
+create trigger ensure_last_owner
+before update or delete on auth.users
+for each row execute function public.check_last_owner();
+
+-- 6. وظيفة لفرض تغيير كلمة المرور (إضافة علامة في metadata)
+-- سيتم التعامل معها في الواجهة الأمامية أو Middleware
+
