@@ -1,40 +1,80 @@
 # معتز العلقمي — Moataz AI
 
-منصة React/Vite عربية تعمل على Vercel وتستخدم Supabase Auth وPostgres وRLS، مع استدعاء حقيقي لمزودي الذكاء الاصطناعي.
+نسخة أولية إنتاجية لمنصة عربية على React/Vite + Vercel Functions + Supabase Auth/Postgres. تركز هذه النسخة على المصادقة والإدارة والمحادثة الحقيقية مع مزودي الذكاء الاصطناعي، دون دفع أو اشتراكات داخلية.
+
+## ما يعمل فعليًا
+
+- تسجيل الدخول بالبريد أو اسم المستخدم وكلمة المرور.
+- ملف `profiles` آمن كمصدر رسمي للأدوار: `owner`, `admin`, `supervisor`, `user`.
+- لوحة إدارة للمستخدمين: إنشاء، تفعيل/إيقاف، تغيير الدور، إعادة تعيين كلمة مرور مؤقتة، وحذف بواسطة المالك.
+- إنشاء حساب باسم مستخدم فقط عبر بريد داخلي لا يظهر للمستخدم.
+- تهيئة المالك الأول رسميًا عبر Supabase Admin API، بدل الإدخال المباشر في `auth.users`.
+- تخزين مفاتيح المزودات مشفّرة بـ AES-256-GCM من جهة الخادم، مع منع جدول المفاتيح من الوصول المباشر عبر المتصفح.
+- Gemini وAnthropic ومزودات OpenAI-compatible، بما فيها OpenAI وOpenRouter وGroq وDeepSeek وMistral وTogether وNVIDIA.
+- اكتشاف فعلي للنماذج، مع اختبار توليد بديل عندما لا يدعم المزود `/models`.
+- تشخيص أخطاء المفتاح والصلاحية والرصيد وحد الطلبات والنموذج والبوابة والشبكة والمهلة وخادم المزود، مع عرض رسالة المزود الأصلية.
+- حماية Base URL من SSRF عبر منع localhost والشبكات الخاصة والتحقق من DNS.
+- محادثات ورسائل محفوظة في Supabase ومعزولة بسياسات RLS.
+- تقييد ذري للطلبات داخل PostgreSQL لمسارات الدخول والإدارة والمزودات والمحادثة.
+- `/api/health` و`/api/ready` للفحص التشغيلي؛ readiness يتحقق أيضًا من قاعدة البيانات وخدمة التقييد.
+
+GitHub وTelegram وMCP ووضع الوكيل معروضة كميزات غير مفعلة، ولا تعرض المنصة اتصالًا وهميًا بها.
+
+## إعداد قاعدة البيانات
+
+1. أنشئ مشروع Supabase.
+2. نفّذ `supabase/schema.sql` كاملًا في SQL Editor.
+3. انسخ `.env.example` إلى `.env.local` للتطوير، وأضف القيم نفسها في Vercel دون رفع الأسرار إلى GitHub.
+
+## تهيئة المالك الأول
+
+اضبط مؤقتًا:
+
+```env
+BOOTSTRAP_OWNER_EMAIL=mtzallqmy@gmail.com
+BOOTSTRAP_OWNER_PASSWORD=كلمة-مؤقتة-قوية
+BOOTSTRAP_TOKEN=رمز-عشوائي-طويل-جداً
+```
+
+بعد النشر نفّذ:
+
+```bash
+curl -X POST https://YOUR_DOMAIN/api/setup/bootstrap \
+  -H 'Content-Type: application/json' \
+  -H 'X-Bootstrap-Token: YOUR_LONG_TOKEN' \
+  -d '{}'
+```
+
+بعد نجاح الطلب، احذف `BOOTSTRAP_TOKEN` و`BOOTSTRAP_OWNER_PASSWORD` من Vercel وأعد النشر. سيُطلب من المالك تغيير كلمة المرور عند أول دخول.
+
+إذا كان البريد موجودًا مسبقًا في Supabase Auth، يمكن تشغيل `supabase/execute-bootstrap.sql` لترقيته فقط. لا ينشئ هذا SQL مستخدمًا ولا يغيّر كلمة المرور.
 
 ## التشغيل المحلي
 
 ```bash
-npm install
+npm ci
 cp .env.example .env.local
-npm run dev
+npx vercel dev
 ```
+
+`npm run dev` يشغّل واجهة Vite فقط؛ استخدم `vercel dev` لتشغيل الواجهة وVercel Functions معًا محليًا.
+
+## التحقق الكامل
+
+```bash
+npm run check
+```
+
+ويشمل lint وTypeScript للواجهة والـ API والاختبارات والبناء الإنتاجي.
+
+## متطلبات النشر
+
+- Node.js 20 أو أحدث.
+- جميع المتغيرات ذات `VITE_` فقط قابلة للظهور في المتصفح.
+- `SUPABASE_SERVICE_ROLE_KEY` و`ENCRYPTION_KEY` وبيانات bootstrap تبقى Server-only.
+- استخدم HTTPS لمزودات API في الإنتاج.
+- فعّل Email Auth في Supabase واضبط Site URL وRedirect URLs على نطاق Vercel.
 
 ## قبل النشر
 
-1. نفّذ `supabase/schema.sql` في SQL Editor.
-2. أضف متغيرات `.env.example` في Vercel لكل البيئات المطلوبة.
-3. اجعل `VITE_SUPABASE_URL` و`VITE_SUPABASE_ANON_KEY` أو المفتاح publishable عامين فقط.
-4. اجعل `SUPABASE_SERVICE_ROLE_KEY` و`ENCRYPTION_KEY` متغيرين server-only، ولا تستخدم لهما بادئة `VITE_`.
-5. فعّل Email Auth في Supabase واضبط Site URL وRedirect URLs على نطاق Vercel.
-
-## ما تم إصلاحه
-
-- إزالة المصادقة الوهمية وlocalStorage للمستخدمين، واستبدالها بـ Supabase Auth.
-- ربط المحادثات والرسائل بقاعدة Supabase مع سياسات RLS وعزل حسب `auth.uid()`.
-- إضافة وظائف Vercel محمية بجلسة Supabase لإدارة المزودات والدردشة.
-- تشفير مفاتيح API في الخادم باستخدام AES-256-GCM وعدم إرسالها أو تخزينها في المتصفح.
-- دعم Gemini وAnthropic وOpenAI وOpenRouter وجميع المزودات OpenAI-compatible عبر Base URL.
-- اختبار حقيقي للمفتاح واكتشاف النماذج من واجهة المزود، مع إرجاع رسائل الخطأ الفعلية.
-- بث SSE لمزودي OpenAI-compatible، وإيقاف التوليد من الواجهة.
-- إصلاح توجيه SPA في Vercel حتى لا يبتلع مسارات `/api`.
-
-## التحقق
-
-```bash
-npm run typecheck
-npm run typecheck:api
-npm run build
-```
-
-لا توجد مفاتيح مزود افتراضية مطلوبة؛ يضيف كل مستخدم مفتاحه من صفحة «المزودون».
+راجع [PRODUCTION-CHECKLIST.md](./PRODUCTION-CHECKLIST.md) و[SECURITY.md](./SECURITY.md). لا يحتوي المشروع على كلمة مرور المالك أو مفاتيح حقيقية؛ تُضبط جميعها كمتغيرات خادمية.

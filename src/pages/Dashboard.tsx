@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { MessageCircle, Bot, Plug, TrendingUp, Plus, ArrowLeft } from 'lucide-react'
+import { MessageCircle, Bot, Plug, Plus, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { Chat, Provider } from '../types'
 import { formatDate } from '../lib/utils'
@@ -10,7 +10,7 @@ export default function Dashboard() {
   const { user } = useAuth()
   const [chats, setChats] = useState<Chat[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
-  const [stats, setStats] = useState({ chats: 0, providers: 0, integrations: 2 })
+  const [stats, setStats] = useState({ chats: 0, providers: 0, integrations: 0 })
 
   useEffect(() => {
     if (!user || !supabase) return
@@ -22,14 +22,14 @@ export default function Dashboard() {
       const parsedProviders = (providerBody.providers || []) as Provider[]
       setChats(parsedChats.slice(0, 5))
       setProviders(parsedProviders)
-      setStats(s => ({ ...s, providers: parsedProviders.length, chats: parsedChats.length }))
+      setStats(s => ({ ...s, providers: parsedProviders.filter(provider => provider.status === 'connected').length, chats: parsedChats.length }))
     }).catch(() => undefined)
   }, [user])
 
   const quickActions = [
     { to: '/chat', icon: MessageCircle, label: 'محادثة جديدة', desc: 'ابدأ دردشة مع نموذج ذكي' },
     { to: '/providers', icon: Bot, label: 'إضافة مزود', desc: 'ربط Gemini أو OpenAI أو NVIDIA' },
-    { to: '/integrations', icon: Plug, label: 'إدارة التكاملات', desc: 'GitHub • Telegram • MCP' },
+    { to: '/integrations', icon: Plug, label: 'إدارة التكاملات', desc: 'لا توجد تكاملات خارجية مفعّلة • MCP' },
   ]
 
   return (
@@ -57,9 +57,7 @@ export default function Dashboard() {
             </div>
             <div className="p-3 bg-primary-950 rounded-2xl"><MessageCircle className="text-primary-400" /></div>
           </div>
-          <div className="text-emerald-400 text-xs mt-4 flex items-center gap-1">
-            <TrendingUp size={14} /> +{Math.floor(Math.random()*4)+1} هذا الأسبوع
-          </div>
+          <div className="text-xs mt-4 text-dark-400">إجمالي المحادثات المحفوظة</div>
         </div>
 
         <div className="card p-6">
@@ -70,7 +68,7 @@ export default function Dashboard() {
             </div>
             <div className="p-3 bg-emerald-950 rounded-2xl"><Bot className="text-emerald-400" /></div>
           </div>
-          <div className="text-xs mt-4 text-dark-400">من أصل 12 مزود مدعوم</div>
+          <div className="text-xs mt-4 text-dark-400">مزودات اختُبرت واتصلت بنجاح</div>
         </div>
 
         <div className="card p-6">
@@ -81,7 +79,7 @@ export default function Dashboard() {
             </div>
             <div className="p-3 bg-amber-950 rounded-2xl"><Plug className="text-amber-400" /></div>
           </div>
-          <div className="text-xs mt-4 text-dark-400">GitHub • Telegram</div>
+          <div className="text-xs mt-4 text-dark-400">لا توجد تكاملات خارجية مفعّلة</div>
         </div>
       </div>
 

@@ -16,7 +16,7 @@ export function truncate(str: string, length: number) { return str.length > leng
 
 async function parseError(response: Response) {
   const text = await response.text()
-  try { const body = JSON.parse(text); return body.error || body.message || text } catch { return text || `خطأ في الخادم (${response.status})` }
+  try { const body = JSON.parse(text); const detail = body?.details?.diagnostic || body?.details || body?.diagnostic; return detail?.providerMessage || body.error || body.message || text } catch { return text || `خطأ في الخادم (${response.status})` }
 }
 
 type ChatParams = {
@@ -68,21 +68,4 @@ export async function sendRealStreamingChat(params: ChatParams, onChunk: (partia
     }
   }
   return { content: fullContent, tokens: Math.ceil(fullContent.length / 4) }
-}
-
-export function getMockModels(providerType: string): string[] {
-  const models: Record<string, string[]> = {
-    gemini: ['gemini-2.0-flash', 'gemini-1.5-flash'],
-    openai: ['gpt-4o-mini', 'gpt-4o'],
-    'openai-compatible': ['gpt-4o-mini'],
-    openrouter: ['openai/gpt-4o-mini', 'google/gemini-2.0-flash-001'],
-    anthropic: ['claude-3-5-sonnet-latest'],
-    nvidia: ['meta/llama-3.1-70b-instruct'],
-    groq: ['llama-3.3-70b-versatile'],
-    deepseek: ['deepseek-chat'],
-    mistral: ['mistral-large-latest'],
-    together: ['meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'],
-    custom: [],
-  }
-  return models[providerType] || []
 }

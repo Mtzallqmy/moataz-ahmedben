@@ -1,34 +1,9 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../_lib/vercel'
 import { authenticate, getAdminClient } from '../_lib/supabase'
 import { decryptSecret } from '../_lib/crypto'
-import { errorMessage, methodNotAllowed, setJsonHeaders } from '../_lib/http'
-
-const defaults: Record<string, string> = {
-  'openai-compatible': 'https://api.openai.com/v1',
-  openai: 'https://api.openai.com/v1',
-  openrouter: 'https://openrouter.ai/api/v1',
-  groq: 'https://api.groq.com/openai/v1',
-  deepseek: 'https://api.deepseek.com/v1',
-  mistral: 'https://api.mistral.ai/v1',
-  together: 'https://api.together.xyz/v1',
-  nvidia: 'https://integrate.api.nvidia.com/v1',
-}
-
-function apiUrl(type: string, baseUrl?: string) {
-  if (type === 'gemini') return 'https://generativelanguage.googleapis.com/v1beta'
-  if (type === 'anthropic') return (baseUrl || 'https://api.anthropic.com/v1').replace(/\/$/, '')
-  return (baseUrl || defaults[type] || '').replace(/\/$/, '')
-}
-
-async function readError(response: Response) {
-  const text = await response.text()
-  try {
-    const json = JSON.parse(text)
-    return json?.error?.message || json?.message || text.slice(0, 500)
-  } catch {
-    return text.slice(0, 500) || `HTTP ${response.status}`
-  }
-}
+import { ApiError, methodNotAllowed, sendError, setJsonHeaders } from '../_lib/http'
+import { testProviderConnection, type ProviderRecord } from '../_lib/provider-runtime'
+import { enforceRateLimit } from '../_lib/rate-limit'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setJsonHeaders(res)
@@ -36,8 +11,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { user } = await authenticate(req)
+    await enforceRateLimit(req, 'provider_test', 30, 300, user.id)
     const providerId = typeof req.body?.providerId === 'string' ? req.body.providerId : ''
-    if (!providerId) return res.status(400).json({ success: false, message: 'providerId مطلوب' })
+    if (!providerId) throw new ApiError(400, 'providerId مطلوب', 'provider_id_required')
 
     const admin = getAdminClient()
     const { data: provider, error } = await admin
@@ -46,49 +22,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('id', providerId)
       .eq('user_id', user.id)
       .maybeSingle()
-    if (error) throw error
-    if (!provider) return res.status(404).json({ success: false, message: 'المزود غير موجود' })
+    if (error) throw new ApiError(500, 'تعذر قراءة المزود', 'provider_read_failed')
+    if (!provider) throw new ApiError(404, 'المزود غير موجود', 'provider_not_found')
 
     const apiKey = decryptSecret(provider.encrypted_key)
-    let models: string[] = []
-    let message = 'تم الاتصال بنجاح'
-
-    if (provider.type === 'gemini') {
-      const response = await fetch(`${apiUrl('gemini')}/models?key=${encodeURIComponent(apiKey)}`)
-      if (!response.ok) throw new Error(await readError(response))
-      const data = await response.json() as { models?: Array<{ name?: string; supportedGenerationMethods?: string[] }> }
-      models = (data.models || [])
-        .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
-        .map(model => (model.name || '').replace(/^models\//, ''))
-        .filter(Boolean)
-    } else if (provider.type === 'anthropic') {
-      const response = await fetch(`${apiUrl('anthropic')}/models`, {
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      })
-      if (!response.ok) throw new Error(await readError(response))
-      const data = await response.json() as { data?: Array<{ id?: string }> }
-      models = (data.data || []).map(model => model.id || '').filter(Boolean)
-    } else {
-      const response = await fetch(`${apiUrl(provider.type, provider.base_url)}/models`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      })
-      if (!response.ok) throw new Error(await readError(response))
-      const data = await response.json() as { data?: Array<{ id?: string }> }
-      models = (data.data || []).map(model => model.id || '').filter(Boolean)
-    }
-
+    const diagnostic = await testProviderConnection(provider as ProviderRecord, apiKey)
     const now = new Date().toISOString()
-    await admin.from('providers').update({
-      status: 'connected',
+
+    const { error: updateError } = await admin.from('providers').update({
+      status: diagnostic.success ? 'connected' : 'error',
       last_tested_at: now,
-      error_message: null,
-      models,
+      error_message: diagnostic.success ? null : diagnostic.providerMessage || diagnostic.message,
+      models: diagnostic.models,
+      detected_protocol: diagnostic.detectedProtocol,
+      diagnostic,
+      last_latency_ms: diagnostic.latencyMs,
+      last_http_status: diagnostic.httpStatus || null,
       updated_at: now,
     }).eq('id', provider.id).eq('user_id', user.id)
+    if (updateError) console.error('[provider-diagnostic-save-failed]', updateError)
 
-    return res.status(200).json({ success: true, message, models, testedAt: now })
+    return res.status(diagnostic.success ? 200 : 422).json({
+      success: diagnostic.success,
+      message: diagnostic.message,
+      models: diagnostic.models,
+      testedAt: now,
+      diagnostic,
+    })
   } catch (error) {
-    const message = errorMessage(error)
-    return res.status(message.includes('جلسة') ? 401 : 400).json({ success: false, message })
+    return sendError(res, error)
   }
 }

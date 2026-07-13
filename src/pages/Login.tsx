@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { toast } from 'sonner'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -17,13 +17,13 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) {
-      toast.error('يرجى إدخال البريد وكلمة المرور')
+    if (!identifier || !password) {
+      toast.error('يرجى إدخال اسم المستخدم أو البريد وكلمة المرور')
       return
     }
     
     setIsLoading(true)
-    const success = await login(email, password)
+    const success = await login(identifier, password)
     setIsLoading(false)
     
     if (success) {
@@ -50,13 +50,13 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium mb-2 text-dark-300">البريد الإلكتروني</label>
+              <label className="block text-sm font-medium mb-2 text-dark-300">اسم المستخدم أو البريد الإلكتروني</label>
               <input 
-                type="email" 
+                type="text" 
                 className="input" 
-                placeholder="you@example.com" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)}
+                placeholder="moataz أو you@example.com" 
+                value={identifier} 
+                onChange={e => setIdentifier(e.target.value)}
                 required 
               />
             </div>

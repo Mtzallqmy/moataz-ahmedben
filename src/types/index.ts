@@ -1,14 +1,37 @@
+export type AppRole = 'owner' | 'admin' | 'supervisor' | 'user'
+
 export interface User {
   id: string
   name: string
+  username?: string | null
   email: string
+  loginEmail?: string
   avatar?: string
-  roles?: string[]
+  role: AppRole
+  roles?: AppRole[]
+  isActive: boolean
   forcePasswordChange?: boolean
   createdAt: string
 }
 
 export type ProviderType = 'gemini' | 'openai' | 'openai-compatible' | 'openrouter' | 'anthropic' | 'nvidia' | 'groq' | 'deepseek' | 'mistral' | 'together' | 'custom'
+
+export interface ProviderDiagnostic {
+  success: boolean
+  message: string
+  providerMessage?: string
+  category?: 'authentication' | 'authorization' | 'rate_limit' | 'quota' | 'model' | 'endpoint' | 'validation' | 'network' | 'timeout' | 'upstream' | 'unknown'
+  code?: string
+  httpStatus?: number
+  endpoint?: string
+  requestId?: string
+  hint?: string
+  detectedProtocol: 'gemini' | 'anthropic' | 'openai-compatible'
+  models: string[]
+  latencyMs: number
+  testedModel?: string
+  warning?: string
+}
 
 export interface Provider {
   id: string
@@ -21,6 +44,25 @@ export interface Provider {
   status: 'connected' | 'error' | 'untested'
   errorMessage?: string
   models?: string[]
+  detectedProtocol?: string
+  diagnostic?: ProviderDiagnostic
+  lastLatencyMs?: number
+  lastHttpStatus?: number
+}
+
+export interface AdminUser {
+  id: string
+  username?: string | null
+  name: string
+  email: string
+  loginEmail?: string
+  role: AppRole
+  isActive: boolean
+  mustChangePassword: boolean
+  isInternalEmail: boolean
+  lastLoginAt?: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Chat {
@@ -50,7 +92,7 @@ export interface Message {
 export interface ToolCall {
   id: string
   name: string
-  args: Record<string, any>
+  args: Record<string, unknown>
   result?: string
   status: 'pending' | 'success' | 'error'
 }
@@ -71,7 +113,7 @@ export interface Integration {
   type: 'github' | 'telegram' | 'mcp'
   name: string
   connected: boolean
-  config: Record<string, any>
+  config: Record<string, unknown>
   lastSync?: string
   status: string
 }
