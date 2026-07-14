@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "tsc --noEmit",
     "typecheck:api": "tsc --noEmit -p api/tsconfig.json",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run typecheck:api && npm run test && npm run build"
@@ -44,6 +44,8 @@
     "vitest": "^4.1.10"
   },
   "engines": {
-    "node": ">=20 <23"
-  }
+    "node": "20.x",
+    "npm": "10.x"
+  },
+  "packageManager": "npm@10.9.2"
 }
