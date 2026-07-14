@@ -21,10 +21,8 @@ import type { AppRole } from './types'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
-  const location = useLocation()
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-dark-950"><div className="flex flex-col items-center gap-4"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /><p className="text-dark-400 text-sm">جارٍ التحقق من الجلسة...</p></div></div>
-  if (!user) return <Navigate to="/login" state={{ from: location }} replace />
-  if (user.forcePasswordChange && location.pathname !== '/settings') return <Navigate to="/settings" replace />
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-dark-950"><div className="flex flex-col items-center gap-4"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /><p className="text-dark-400 text-sm">جارٍ التحميل...</p></div></div>
+  // في وضع الوصول العام، نسمح دائماً بالمرور
   return <>{children}</>
 }
 
@@ -53,8 +51,8 @@ const protectedPage = (page: React.ReactNode) => <ProtectedRoute><AppLayout>{pag
 export default function App() {
   return <ThemeProvider><AuthProvider><Routes>
     <Route path="/" element={<Landing />} />
-    <Route path="/login" element={<Login />} />
-    <Route path="/register" element={<Register />} />
+    <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+    <Route path="/register" element={<Navigate to="/dashboard" replace />} />
     <Route path="/privacy" element={<Privacy />} />
     <Route path="/terms" element={<Terms />} />
     <Route path="/dashboard" element={protectedPage(<Dashboard />)} />

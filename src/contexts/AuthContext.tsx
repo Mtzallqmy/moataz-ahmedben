@@ -2,8 +2,18 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import type { User } from '../types'
-import { apiJson, authHeaders } from '../lib/api'
-import { supabase } from '../lib/supabase'
+
+// مستخدم ضيف افتراضي لتخطي تسجيل الدخول
+const GUEST_USER: User = {
+  id: 'guest-user-id',
+  name: 'معتز العلقمي',
+  username: 'mtzallqmy',
+  email: 'mtzallqmy@gmail.com',
+  role: 'owner',
+  isActive: true,
+  createdAt: new Date().toISOString(),
+  forcePasswordChange: false
+}
 
 interface AuthContextType {
   user: User | null
@@ -18,132 +28,48 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-function configError() {
-  return 'إعدادات Supabase غير مكتملة. أضف VITE_SUPABASE_URL وVITE_SUPABASE_ANON_KEY في Vercel.'
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // تعيين المستخدم الضيف افتراضياً وتخطي حالة التحميل
+  const [user, setUser] = useState<User | null>(GUEST_USER)
+  const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
 
   const refreshUser = useCallback(async () => {
-    if (!supabase) { setUser(null); return }
-    const { data } = await supabase.auth.getSession()
-    if (!data.session) { setUser(null); return }
-    try {
-      const body = await apiJson<{ user: User }>('/api/auth/me', { headers: await authHeaders(false) })
-      setUser(body.user)
-    } catch (error: any) {
-      if (error?.status === 401 || error?.status === 403) {
-        await supabase.auth.signOut()
-        setUser(null)
-      }
-      throw error
-    }
+    // لا حاجة للتحقق من الجلسة في وضع الضيف
+    setUser(GUEST_USER)
   }, [])
 
   useEffect(() => {
-    if (!supabase) { setIsLoading(false); return }
-    let mounted = true
-    void refreshUser().catch((error) => {
-      if (mounted) toast.error(error instanceof Error ? error.message : 'تعذر التحقق من الجلسة')
-    }).finally(() => { if (mounted) setIsLoading(false) })
+    // تأكيد تعيين المستخدم عند بدء التطبيق
+    setUser(GUEST_USER)
+    setIsLoading(false)
+  }, [])
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
-      if (!mounted) return
-      if (event === 'SIGNED_OUT') setUser(null)
-      if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
-        queueMicrotask(() => void refreshUser().catch(() => undefined))
-      }
-    })
-    return () => { mounted = false; listener.subscription.unsubscribe() }
-  }, [refreshUser])
-
-  const login = async (identifier: string, password: string) => {
-    if (!supabase) { toast.error(configError()); return false }
-    try {
-      const body = await apiJson<{
-        session: { access_token: string; refresh_token: string }
-        user: User
-      }>('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: identifier.trim(), password }),
-      })
-      const { error } = await supabase.auth.setSession({
-        access_token: body.session.access_token,
-        refresh_token: body.session.refresh_token,
-      })
-      if (error) throw error
-      setUser(body.user)
-      toast.success(`مرحباً بعودتك، ${body.user.name}`)
-      return true
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر تسجيل الدخول')
-      return false
-    }
+  const login = async (_identifier: string, _password: string) => {
+    setUser(GUEST_USER)
+    toast.success(`مرحباً بك، ${GUEST_USER.name}`)
+    return true
   }
 
-  const register = async (name: string, email: string, password: string, username?: string) => {
-    if (!supabase) { toast.error(configError()); return false }
-    try {
-      const body = await apiJson<{
-        session: { access_token: string; refresh_token: string } | null
-        user: User
-        requiresEmailConfirmation: boolean
-      }>('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, username }),
-      })
-      if (body.session) {
-        await supabase.auth.setSession({ access_token: body.session.access_token, refresh_token: body.session.refresh_token })
-        setUser(body.user)
-      }
-      toast.success(body.requiresEmailConfirmation ? 'تم إنشاء الحساب. تحقق من بريدك لتفعيله.' : 'تم إنشاء الحساب بنجاح')
-      return true
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء الحساب')
-      return false
-    }
+  const register = async (name: string, _email: string, _password: string, _username?: string) => {
+    setUser({ ...GUEST_USER, name })
+    toast.success('تم إنشاء الحساب بنجاح (وضع الوصول العام)')
+    return true
   }
 
   const logout = async () => {
-    if (supabase) await supabase.auth.signOut({ scope: 'local' })
-    setUser(null)
-    navigate('/login')
+    // في وضع الوصول العام، تسجيل الخروج يعيد التوجيه فقط
+    navigate('/')
   }
 
   const updateUser = async (updates: Partial<User>) => {
-    if (!user) return
-    try {
-      const body = await apiJson<{ user: User }>('/api/auth/profile', {
-        method: 'PATCH',
-        headers: await authHeaders(),
-        body: JSON.stringify({ name: updates.name, avatar: updates.avatar }),
-      })
-      setUser(body.user)
-      toast.success('تم تحديث الملف الشخصي')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر تحديث الملف الشخصي')
-    }
+    setUser((current) => current ? { ...current, ...updates } : GUEST_USER)
+    toast.success('تم تحديث الملف الشخصي محلياً')
   }
 
-  const changePassword = async (password: string) => {
-    try {
-      await apiJson('/api/auth/password', {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify({ password }),
-      })
-      setUser((current) => current ? { ...current, forcePasswordChange: false } : current)
-      toast.success('تم تغيير كلمة المرور')
-      return true
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'تعذر تغيير كلمة المرور')
-      return false
-    }
+  const changePassword = async (_password: string) => {
+    toast.success('تم تغيير كلمة المرور محلياً')
+    return true
   }
 
   return <AuthContext.Provider value={{ user, isLoading, login, register, logout, updateUser, changePassword, refreshUser }}>{children}</AuthContext.Provider>
