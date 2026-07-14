@@ -9,7 +9,7 @@ const providerTypes: Array<{ value: ProviderType; label: string }> = [
   { value: 'gemini', label: 'Google Gemini' }, { value: 'anthropic', label: 'Anthropic Claude' },
   { value: 'groq', label: 'Groq' }, { value: 'deepseek', label: 'DeepSeek' },
   { value: 'mistral', label: 'Mistral AI' }, { value: 'together', label: 'Together AI' },
-  { value: 'nvidia', label: 'NVIDIA NIM' }, { value: 'openai-compatible', label: 'OpenAI-compatible' },
+  { value: 'nvidia', label: 'NVIDIA NIM' }, { value: 'dahl', label: 'dahl.global (Kimi)' }, { value: 'openai-compatible', label: 'OpenAI-compatible' },
   { value: 'custom', label: 'مخصص/اكتشاف تلقائي' },
 ]
 

@@ -59,6 +59,7 @@ const defaultBaseUrls: Record<string, string> = {
   nvidia: 'https://integrate.api.nvidia.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
   anthropic: 'https://api.anthropic.com/v1',
+  dahl: 'https://inference.dahl.global/v1',
   custom: '',
 }
 

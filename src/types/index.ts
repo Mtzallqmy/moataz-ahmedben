@@ -14,7 +14,7 @@ export interface User {
   createdAt: string
 }
 
-export type ProviderType = 'gemini' | 'openai' | 'openai-compatible' | 'openrouter' | 'anthropic' | 'nvidia' | 'groq' | 'deepseek' | 'mistral' | 'together' | 'custom'
+export type ProviderType = 'gemini' | 'openai' | 'openai-compatible' | 'openrouter' | 'anthropic' | 'nvidia' | 'groq' | 'deepseek' | 'mistral' | 'together' | 'dahl' | 'custom'
 
 export interface ProviderDiagnostic {
   success: boolean
